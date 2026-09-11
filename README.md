@@ -73,9 +73,6 @@ OCT and 35.4 min for exhaustive OCT (Table 2).
 
 ## Notes
 
-- Prediction CSVs and checkpoints are the current five-fold
-  leave-one-wafer-out pipeline export. After any retraining, regenerate them
-  with `code/` + `analysis/` and replace the files in place (same names).
 - Raw microscopy images and OCT volumes will be added in a later release.
 
 ## License
