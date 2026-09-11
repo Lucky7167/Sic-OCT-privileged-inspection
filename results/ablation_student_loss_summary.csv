@@ -1,0 +1,7 @@
+variant,AUROC,budget100,per_wafer
+V0 Direct (single-scale),0.623,67.0,64 60 70 78 63
+V1 Student CE-only,1.0,3.5,1 4 4 3 6
+V2 +logit KD,0.999,4.0,7 2 3 2 7
+V3 +utility KD,0.994,20.1,23 25 43 6 5
+V4 full Student,0.996,37.9,33 36 42 39 40
+Teacher (privileged),0.982,24.5,28 8 77 5 4
