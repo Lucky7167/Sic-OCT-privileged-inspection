@@ -1,7 +1,7 @@
 # Learning when to scan: OCT-privileged selective inspection for efficient defect localization in silicon carbide wafers
 
 Code, data exports, trained checkpoints, and figure-reproduction scripts for the
-manuscript submitted to *Light: Advanced Manufacturing*.
+manuscript submitted to *Nature Communications*.
 
 Wide-field bright-field microscopy localizes candidate defects on a 6-inch SiC
 wafer, but cannot resolve whether a defect lies on the surface or buried below
