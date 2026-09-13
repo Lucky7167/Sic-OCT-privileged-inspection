@@ -1,19 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-lupi_components.py — model, dataset, loss and training-loop components for the
-OCT-privileged LUPI teacher–student pipeline (feature-based variant).
-
-Extracted 1:1 from the authors' training code. Everything here operates on the
-REAL exported features in data/ (feats_micro.npy / feats_oct.npy / manifest.csv);
-no synthetic data is generated anywhere in this module.
-
-Layout matches the Methods section of the manuscript:
-  SimDS         dataset over DINOv2 [CLS] patches + OCT features + meta
-  AuxClassifier 384 -> 64 -> 3 head used to derive the readability score R
-  Teacher       four-modality transformer-fusion model with cross-attention pooling
-  Student       microscopy-only deployment model (773-d input MLP, three heads)
-  train_*       training loops (teacher / lessons / student / direct baseline)
-"""
 import json
 from pathlib import Path
 
@@ -24,11 +8,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
-ROOT = Path(".")            # repository root; training loops save under ROOT/checkpoints and ROOT/logs
+ROOT = Path(".")           
 SEED = 42
 rng = np.random.default_rng(SEED)
 torch.manual_seed(SEED)
-DEV = "cpu"                 # feature-based models are small; CPU is sufficient
+DEV = "cpu"               
 DINO, OCTD, META, FEAT = 384, 512, 5, 256
 TAU = 3.0
 CLS = ["normal", "surface", "subsurface"]
@@ -64,7 +48,7 @@ class SimDS(Dataset):
         return item
 
 
-class AuxClassifier(nn.Module):   # 文档 3.6：384→64→3
+class AuxClassifier(nn.Module):   
     def __init__(self):
         super().__init__()
         self.net = nn.Sequential(nn.Linear(DINO, 64), nn.GELU(), nn.Linear(64, 3))
@@ -73,17 +57,16 @@ class AuxClassifier(nn.Module):   # 文档 3.6：384→64→3
         return self.net(f)
 
 
-class Teacher(nn.Module):          # 文档 5.2-5.4（OCT 支路用预提取 512 维）
+class Teacher(nn.Module):         
     def __init__(self):
         super().__init__()
-        self.p_m = nn.Linear(DINO, FEAT)   # M_local / M_ctx 共享投影（同文档）
+        self.p_m = nn.Linear(DINO, FEAT)   
         self.p_o = nn.Linear(OCTD, FEAT)
         self.p_p = nn.Sequential(nn.Linear(META, 64), nn.GELU(),
                                  nn.Linear(64, 32), nn.GELU(), nn.Linear(32, FEAT))
         layer = nn.TransformerEncoderLayer(FEAT, 4, 1024, activation="gelu",
                                            norm_first=True, batch_first=True)
         self.fuse = nn.TransformerEncoder(layer, 1)
-        # 第二步：可学习 query 交叉注意力池化（文档 5.3，替代 mean-pool）
         self.q_f = nn.Parameter(torch.randn(1, 1, FEAT))
         self.xattn = nn.MultiheadAttention(FEAT, 4, batch_first=True)
         self.h_cls, self.h_q = nn.Linear(FEAT, 3), nn.Linear(FEAT, 1)
@@ -92,17 +75,15 @@ class Teacher(nn.Module):          # 文档 5.2-5.4（OCT 支路用预提取 512
     def forward(self, fm, fo, meta):
         tok = torch.stack([self.p_m(fm[:, :DINO]), self.p_m(fm[:, DINO:]),
                            self.p_o(fo), self.p_p(meta)], 1)
-        h = self.fuse(tok)                                # 第一步：模态间交互
+        h = self.fuse(tok)                              
         q = self.q_f.expand(h.size(0), -1, -1)
-        F_T = self.xattn(q, h, h)[0].squeeze(1)           # 第二步：交叉注意力池化
+        F_T = self.xattn(q, h, h)[0].squeeze(1)           
         return dict(F_T=F_T, logits=self.h_cls(F_T),
                     q=torch.sigmoid(self.h_q(F_T)).squeeze(-1),
                     m=self.h_m(F_T), U=torch.sigmoid(self.h_U(F_T)).squeeze(-1))
 
 
-class Student(nn.Module):          # 文档 7.2：773→MLP→三头
-    # direct=True 时为单尺度直连基线（仅 M_local+P，389 维输入；文档 7.8 修订）；
-    # 与 Student 同构的 w/o-distillation 消融由同一权重配置关掉蒸馏项实现
+class Student(nn.Module):          
     def __init__(self, direct=False):
         super().__init__()
         self.direct = direct
@@ -121,10 +102,6 @@ class Student(nn.Module):          # 文档 7.2：773→MLP→三头
                     q=torch.sigmoid(self.h_q(F_S)).squeeze(-1),
                     U=torch.sigmoid(self.h_U(F_S)).squeeze(-1))
 
-
-# ======================================================================
-# 4. 损失与指标（与 common.py 一致）
-# ======================================================================
 def wce(logits, z, counts):
     w = 1.0 / (counts.float() + 1e-8)
     w = w / w.sum() * len(counts)
@@ -166,10 +143,6 @@ def oversample_idx(df, ratio=0.3):
     rest = df.index[df.z_star != 2].tolist()
     return rest + rng.choice(sub, size=int(ratio * len(df)), replace=True).tolist()
 
-
-# ======================================================================
-# 5. 训练循环
-# ======================================================================
 def train_aux(df_tr, fm, norm):
     ds = SimDS(df_tr, fm, {}, norm)
     dl = DataLoader(ds, batch_size=32, shuffle=True)
@@ -192,8 +165,6 @@ def compute_R(aux, df, fm, norm, train_wafers=("A", "B")):
     rs = []
     for b in dl:
         lp = F.log_softmax(aux(b["fm"].to(DEV)[:, :DINO]), -1)
-        # R 的物理含义是"显微可见度"：用干净真值 z_true 计算交叉熵——
-        # 若用带噪 z_obs，R 会被 45% 标签翻转主导，与缺陷深度脱钩
         rs.append((-lp.gather(1, b["z_true"].to(DEV).unsqueeze(1))).squeeze(1).cpu().numpy())
     r = np.concatenate(rs)
     ab = df.wafer.isin(train_wafers).values
@@ -215,24 +186,17 @@ def train_teacher(df_tr, df_va, fm, fo, norm):
         for b in dl_tr:
             o = m(b["fm"].to(DEV), b["fo"].to(DEV), b["meta"].to(DEV))
             z, q, U = b["z"].to(DEV), b["q"].to(DEV), b["U"].to(DEV)
-            msk = (b["z_true"].to(DEV) == 2)   # 形态掩码用干净真值（m* 是客观测量）
-            if msk.any():   # 形态头：subsurface 掩码内回归归一化 m*（文档 5.5）
+            msk = (b["z_true"].to(DEV) == 2) 
+            if msk.any():  
                 l_m = F.huber_loss(o["m"][msk], b["m_tar"].to(DEV)[msk], delta=0.25)
             else:
                 l_m = torch.tensor(0.0)
-            # 成对 margin 排序损失（Spearman 的可微代理）：
-            # 全局 Huber 的梯度被类间大残差主导，细排序（量级 ~0.05）几乎没有
-            # 梯度；成对项直接给秩次学习压力。带 margin 是关键——无 margin 的
-            # softplus(-du·s) 会把 sigmoid 头推到饱和两端（尺度爆炸、全局秩
-            # 次全灭）；margin 让已分开的样本对停止贡献，Huber 锚定绝对尺度
+         
             du = o["U"].unsqueeze(0) - o["U"].unsqueeze(1)
             dt = U.unsqueeze(0) - U.unsqueeze(1)
             sgn = torch.sign(dt)
             zt = b["z_true"].to(DEV)
-            # 分三类样本对、各自匹配 margin（U* 差值的天然量级不同）：
-            # 跨类对差值 ~0.1-0.3 → margin 0.10；subsurface 组内 ~0.05 → 0.05；
-            # normal/surface 组内只有 ~0.02-0.05 → 0.02。
-            # 统一大 margin 会把小组内差值的样本对无限撑开，摧毁类内秩次
+          
             cross = zt.unsqueeze(0) != zt.unsqueeze(1)
             same_ns = (zt.unsqueeze(0) == zt.unsqueeze(1)) & (zt.unsqueeze(0) < 2)
             pm = F.softplus(0.10 - du * sgn)
@@ -257,15 +221,14 @@ def train_teacher(df_tr, df_va, fm, fo, norm):
         sp = spearman(us, uts)
         sp_sub = spearman(us[zs == 2], uts[zs == 2]) if (zs == 2).sum() > 5 else 0.0
         log.append(dict(epoch=ep, va_spearman=sp, va_spearman_sub=sp_sub))
-        # 早停指标 = 全局 Spearman + 0.5×组内 Spearman：
-        # 全局指标由类间差异主导、很早饱和，加入组内项才给效用头细排序的学习压力
+    
         crit = -(sp + 0.5 * sp_sub)
         if crit < best:
             best, bad = crit, 0
             torch.save(m.state_dict(), ROOT / "checkpoints/teacher.pt")
         else:
             bad += 1
-            if bad >= 10000:   # Teacher 固定 150 epoch，不做早停（细排序需要长训练）
+            if bad >= 10000:   
                 break
     pd.DataFrame(log).to_csv(ROOT / "logs/teacher.csv", index=False)
     m.load_state_dict(torch.load(ROOT / "checkpoints/teacher.pt"))
@@ -292,7 +255,7 @@ def train_student_like(name, df_tr, df_va, fm, norm, lessons=None):
     dl_tr = DataLoader(SimDS(df_tr.iloc[oversample_idx(df_tr)], fm, {}, norm, lessons),
                        batch_size=32, shuffle=True)
     dl_va = DataLoader(SimDS(df_va, fm, {}, norm, lessons), batch_size=64)
-    m = Student(direct=(lessons is None)).to(DEV)   # lessons=None → 单尺度 Direct 基线
+    m = Student(direct=(lessons is None)).to(DEV) 
     opt = torch.optim.AdamW(m.parameters(), lr=1e-3, weight_decay=1e-4)
     log = []
     best, bad = -1.0, 0
@@ -303,7 +266,7 @@ def train_student_like(name, df_tr, df_va, fm, norm, lessons=None):
             z, q, U = b["z"].to(DEV), b["q"].to(DEV), b["U"].to(DEV)
             loss = (wce(o["logits"], z, counts) + F.huber_loss(o["q"], q, delta=1.0)
                     + F.huber_loss(o["U"], U, delta=0.25) + rank_loss(o["U"], U))
-            if lessons is not None:      # Student 追加蒸馏通道
+            if lessons is not None:    
                 l_feat = (F.mse_loss(o["phi"], b["F_T"].to(DEV))
                           + (1 - F.cosine_similarity(o["phi"], b["F_T"].to(DEV), -1)).mean())
                 l_kd = TAU**2 * F.kl_div(F.log_softmax(o["logits"] / TAU, -1),
@@ -322,13 +285,13 @@ def train_student_like(name, df_tr, df_va, fm, norm, lessons=None):
         sp = spearman(us, uts)
         sp_sub = spearman(us[zs == 2], uts[zs == 2]) if (zs == 2).sum() > 5 else 0.0
         log.append(dict(epoch=ep, va_spearman=sp, va_spearman_sub=sp_sub))
-        crit = sp + 0.5 * sp_sub          # 与 Teacher 同口径：全局 + 组内
+        crit = sp + 0.5 * sp_sub       
         if crit > best:
             best, bad = crit, 0
             torch.save(m.state_dict(), ROOT / f"checkpoints/{name}.pt")
         else:
             bad += 1
-            if bad >= 10000:              # 固定 epoch，不做早停
+            if bad >= 10000:              
                 break
     pd.DataFrame(log).to_csv(ROOT / f"logs/{name}.csv", index=False)
     m.load_state_dict(torch.load(ROOT / f"checkpoints/{name}.pt"))
@@ -336,9 +299,6 @@ def train_student_like(name, df_tr, df_va, fm, norm, lessons=None):
     return m
 
 
-# ======================================================================
-# 6. 评估与可视化
-# ======================================================================
 @torch.no_grad()
 def infer(model, kind, df, fm, fo, norm):
     ds = SimDS(df, fm, fo, norm)
