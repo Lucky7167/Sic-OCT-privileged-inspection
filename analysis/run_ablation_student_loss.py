@@ -1,21 +1,4 @@
-# -*- coding: utf-8 -*-
-"""
-run_ablation_student_loss.py —— Student loss ablation (LOWO×5, real exported features)
-========================================================================================
-Reproduces the ablation behind Table 1. Runs on the real data exports in data/
-(manifest.csv, feats_micro.npy, feats_oct.npy, norm.json). Model/dataset/loss
-components are imported from lupi_components.py in this directory.
 
-LOWO×5：每折 held-out 一片 wafer；每折重训 Teacher（产生 fold 内 lessons），
-再训练 5 个 Student 变体：
-  V0 Direct        : 单尺度, CE + q + U* + rank（现 Direct 配方）
-  V1 Student-CE    : 双尺度, 仅 CE
-  V2 +logit KD     : CE + 0.5·KD(logits_T)
-  V3 +utility KD   : CE + Huber(U→U_T)
-  V4 full Student  : CE + q + U* + rank + feat + 0.5·KD + KD_U（现 Student 配方）
-指标（held-out wafer）：AUROC(subsurface vs rest)、two-threshold policy 下
-100% subsurface recall 所需 OCT budget（recall-constrained t_lo, Otsu t_hi）。
-"""
 import json, time, sys
 from pathlib import Path
 import numpy as np, pandas as pd
@@ -25,7 +8,7 @@ from sklearn.metrics import roc_auc_score, f1_score
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lupi_components as sp
 
-ROOT = Path(__file__).resolve().parents[1]   # repository root
+ROOT = Path(__file__).resolve().parents[1]   
 mani = pd.read_csv(ROOT / "data/manifest.csv")
 norm = json.loads((ROOT / "data/norm.json").read_text())
 feats_m = np.load(ROOT / "data/feats_micro.npy", allow_pickle=True).item()
@@ -100,7 +83,7 @@ def train_variant(name, df_tr, df_va, lessons, flags, epochs=150, seed=0):
                 if flags.get("kdu"):
                     loss = loss + F.huber_loss(o["U"], b["U_T"].float(), delta=0.25)
             opt.zero_grad(); loss.backward(); opt.step()
-        # ---- model selection on val ----
+
         m.eval(); us, uts, zs, ps = [], [], [], []
         with torch.no_grad():
             for b in dl_va:
@@ -144,7 +127,7 @@ t_start = time.time()
 for fold, held in enumerate(["A", "B", "C", "D", "E"]):
     df_pool = mani[mani.wafer != held].reset_index(drop=True)
     df_te   = mani[mani.wafer == held].reset_index(drop=True)
-    # stratified 90/10 train/val within pool
+
     idx_va = (df_pool.groupby("z_star", group_keys=False)
               .apply(lambda g: g.sample(frac=0.10, random_state=fold)).index)
     df_va = df_pool.loc[idx_va].reset_index(drop=True)
@@ -152,7 +135,7 @@ for fold, held in enumerate(["A", "B", "C", "D", "E"]):
 
     teacher = sp.train_teacher(df_tr, df_va, feats_m, feats_o, norm)
     lessons = make_lessons(teacher, pd.concat([df_tr, df_va]))
-    # teacher predictions (privileged upper bound, same every variant block)
+ 
     dl_te = DataLoader(sp.SimDS(df_te, feats_m, feats_o, norm), batch_size=64)
     trows = []
     with torch.no_grad():
