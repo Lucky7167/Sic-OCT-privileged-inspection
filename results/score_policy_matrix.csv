@@ -1,7 +1,0 @@
-score_source,topK_budget_at_100pct,two_threshold_budget_at_100pct
-Anomaly (5-NN),91.1,76.3
-Direct-U,96.9,61.1
-Entropy reject (Direct),,71.9
-1-max-softmax reject (Direct),,71.4
-Student (ours),46.6,28.4
-Teacher (privileged upper bound),37.3,31.7

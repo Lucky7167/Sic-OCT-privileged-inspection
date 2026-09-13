@@ -1,6 +1,0 @@
-variant,AUROC_med,budget_at_100pct_recall
-"V0 Direct (single-scale, no privilege)",0.86,61.1
-"V1 + dual-scale microscopy, CE only",0.88,46.0
-V2 + logit KD (T=3),0.94,40.8
-V3 + utility KD (U_T regression),0.97,34.1
-V4 full Student (ours),0.98,28.4
