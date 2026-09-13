@@ -31,10 +31,8 @@ sic-oct-privileged-inspection/
 ├── analysis/             # Feature-based training components + Table 1 ablation
 │   ├── lupi_components.py        # models / dataset / losses / training loops
 │   └── run_ablation_student_loss.py   # LOWO×5 student-loss ablation
-├── figures/              # One folder per figure; see figures/README.md
 ├── data/                 # Manifest, features, prediction CSVs; see data/README.md
 ├── checkpoints/          # Trained weights: teacher / student / direct / lessons
-├── results/              # Ablation and strategy-matrix result tables (CSV)
 └── outputs/              # All scripts write their figures here
 ```
 
