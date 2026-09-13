@@ -1,4 +1,4 @@
-# Learning when to scan: OCT-privileged selective inspection for efficient defect localization in silicon carbide wafers
+# Learning when to acquire depth-resolved evidence for resource-efficient silicon carbide wafer inspection
 
 Code, data exports, trained checkpoints, and figure-reproduction scripts for the
 manuscript submitted to *Nature Communications*.
