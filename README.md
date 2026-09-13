@@ -47,10 +47,10 @@ All figure and analysis scripts are run **from the repository root** and read
 from `data/`, writing to `outputs/`:
 
 ```bash
-python figures/fig3/draw_fig3d_736.py     # Fig. 3d error-capture curve
-python figures/fig4/draw_fig4_v2.py       # Fig. 4
-python figures/fig5/draw_fig5a_v2.py      # Fig. 5 panels a–f (one script each)
-python analysis/run_ablation_student_loss.py   # Table 1 ablation (LOWO×5, CPU)
+python figures/fig3/draw_fig3d_736.py     
+python figures/fig4/draw_fig4_v2.py       
+python figures/fig5/draw_fig5a_v2.py     
+python analysis/run_ablation_student_loss.py   
 ```
 
 The volume-based training pipeline in `code/` expects raw OCT volumes under
