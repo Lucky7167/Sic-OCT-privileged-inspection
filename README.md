@@ -43,16 +43,6 @@ python -m venv .venv && source .venv/bin/activate   # or conda
 pip install -r requirements.txt
 ```
 
-All figure and analysis scripts are run **from the repository root** and read
-from `data/`, writing to `outputs/`:
-
-```bash
-python figures/fig3/draw_fig3d_736.py     
-python figures/fig4/draw_fig4_v2.py       
-python figures/fig5/draw_fig5a_v2.py     
-python analysis/run_ablation_student_loss.py   
-```
-
 The volume-based training pipeline in `code/` expects raw OCT volumes under
 `data/volumes/{roi_id}.npy` (`(3, 64, 64, 64)` float32), which are not part of
 this release (see `data/README.md`); the DINOv2 patch features, OCT features,
