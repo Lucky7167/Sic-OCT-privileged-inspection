@@ -5,7 +5,5 @@ pandas
 matplotlib
 scikit-learn
 scipy
-pdfplumber
-openpyxl
 Pillow
 pytest
