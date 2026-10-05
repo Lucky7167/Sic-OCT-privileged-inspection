@@ -44,7 +44,7 @@ The data supporting this study are currently being curated for public release.
 The processed data and associated metadata required to reproduce the experiments
 will be made available in this repository upon completion of data organization.
 
-## Protocol safeguards
+## Reproducibility and leakage safeguards
 
 - `train_lowo.py` holds out one complete wafer for testing and a different
   complete wafer for checkpoint selection in every outer fold.
